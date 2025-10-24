@@ -72,8 +72,8 @@ class ItemOrServiceInputType(OpenIMISMutation.Input):
     uuid = graphene.String(required=False)
     code = ServiceCodeInputType(required=True)
     name = graphene.String(required=True)
-    type = graphene.String(required=True)
-    care_type = graphene.String(required=True)
+    type = graphene.String(required=False)
+    care_type = graphene.String(required=False)
     patient_category = graphene.Int(required=False)
     patient_categories = graphene.List(of_type=PatientCategoriesEnum, required=False)
     frequency = graphene.Decimal(required=False)
@@ -82,7 +82,7 @@ class ItemOrServiceInputType(OpenIMISMutation.Input):
 
 
 class ServiceInputType(ItemOrServiceInputType):
-    level = graphene.String(required=True)
+    level = graphene.String(required=False)
     packagetype = graphene.String(required=False)
     manualPrice = graphene.String(required=False)
     category = graphene.String(required=False)
