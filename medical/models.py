@@ -343,3 +343,79 @@ class ServiceMutation(core_models.UUIDModel, core_models.ObjectMutation):
     class Meta:
         managed = True
         db_table = "medical_ServiceMutation"
+
+class LaboratoryService(VersionedModel, ItemOrService):
+    id = models.AutoField(db_column='LabServiceID', primary_key=True)
+    uuid = models.CharField(db_column='LabServiceUUID', max_length=36, default=uuid.uuid4, unique=True)
+    code = models.CharField(db_column='LabServiceCode', max_length=6)
+    name = models.CharField(db_column='LabServiceName', max_length=100)
+    description = models.TextField(db_column='Description', blank=True, null=True)
+    price = models.DecimalField(db_column='LabServicePrice', max_digits=18, decimal_places=2)
+    care_type = models.CharField(db_column='LabServiceCareType', max_length=1)
+    frequency = models.SmallIntegerField(db_column='LabServiceFrequency', blank=True, null=True)
+    patient_category = models.SmallIntegerField(db_column='LabServicePatCat', default=Service.DEFAULT_PATIENT_CATEGORY)
+    maximum_amount = models.DecimalField(db_column='MaximumAmount', max_digits=18, decimal_places=2, blank=True, null=True)
+    
+    audit_user_id = models.IntegerField(db_column='AuditUserID')
+
+    def __bool__(self):
+        return self.code is not None and len(self.code) >= 1
+
+    def __str__(self):
+        return self.code + " " + self.name
+
+    def __eq__(self, other):
+        if not isinstance(other, LaboratoryService):
+            return False
+        
+        equals = (
+            self.code == other.code and
+            self.name == other.name and
+            self.price == other.price and
+            self.care_type == other.care_type and
+            self.patient_category == other.patient_category and
+            self.frequency == other.frequency
+        )
+        
+        if equals:
+            if bool(self.description) == bool(other.description):
+                if self.description:
+                    return self.description == other.description
+                else:
+                    return True
+        return False
+
+    def __hash__(self):
+        return hash((self.code, self.id, self.name, self.price, self.care_type, self.patient_category))
+
+    @classmethod
+    def filter_queryset(cls, queryset=None):
+        if queryset is None:
+            queryset = cls.objects.all()
+        queryset = queryset.filter(*core.filter_validity())
+        return queryset
+
+    @classmethod
+    def get_queryset(cls, queryset, user, show_history=False):
+        if isinstance(user, ResolveInfo):
+            user = user.context.user
+        
+        if show_history and user.has_perms(MedicalConfig.gql_query_medical_lab_services_perms):
+            queryset = LaboratoryService.objects.all()
+        else:
+            queryset = LaboratoryService.filter_queryset(queryset)
+        
+        if settings.ROW_SECURITY and user.is_anonymous:
+            return queryset.filter(id=-1)
+
+        return queryset
+
+    def delete(self, hard_delete=False, *args, **kwargs):
+        if hard_delete:
+            super(LaboratoryService, self).delete(*args, **kwargs)
+        else:
+            set_item_or_service_deleted(self, "lab_service")
+
+    class Meta:
+        managed = True
+        db_table = 'tblLabServices'
