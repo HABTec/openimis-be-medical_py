@@ -8,7 +8,8 @@ from django.utils.translation import gettext as _
 from graphene_django import DjangoObjectType
 from graphene_django.filter import DjangoFilterConnectionField
 from medical.gql_mutations import CreateServiceMutation, UpdateServiceMutation, DeleteServiceMutation, \
-    CreateItemMutation, UpdateItemMutation, DeleteItemMutation
+    CreateItemMutation, UpdateItemMutation, DeleteItemMutation, \
+        CreateLaboratoryServiceMutation, UpdateLaboratoryServiceMutation, DeleteLaboratoryServiceMutation 
 from .gql_queries import *
 
 from .apps import MedicalConfig
@@ -88,6 +89,91 @@ class Query(graphene.ObjectType):
         service_code=graphene.String(required=True),
         description="Checks that the specified service code is unique."
     )
+
+    medical_lab_services = OrderedDjangoFilterConnectionField(
+        LaboratoryServiceGQLType,
+        client_mutation_id=graphene.String(),
+        show_history=graphene.Boolean(),
+        orderBy=graphene.List(of_type=graphene.String),
+        pricelist_uuid=graphene.UUID(),
+    )
+    
+    medical_lab_services_str = OrderedDjangoFilterConnectionField(
+        LaboratoryServiceGQLType,
+        str=graphene.String(),
+        date=graphene.Date(),
+        orderBy=graphene.List(of_type=graphene.String),
+        pricelist_uuid=graphene.UUID(),
+    )
+    
+    validate_lab_service_code = graphene.Field(
+        graphene.Boolean,
+        lab_service_code=graphene.String(required=True),
+        description="Checks that the specified laboratory service code is unique."
+    )
+    
+    # Add resolver methods
+    def resolve_medical_lab_services_str(
+        self, info, pricelist_uuid=None, date=None, **kwargs
+    ):
+        if info.context.user.is_anonymous:
+            raise PermissionDenied(_("unauthorized"))
+        
+        search_str = kwargs.get("str")
+        q = LaboratoryService.objects.filter(*filter_validity(date))
+        
+        if pricelist_uuid is not None:
+            q = q.filter(
+                pricelist_details__lab_services_pricelist__uuid=pricelist_uuid,
+                pricelist_details__validity_to__isnull=True
+            )
+        
+        if search_str is not None:
+            q = q.filter(
+                Q(code__icontains=search_str) | Q(name__icontains=search_str)
+            )
+        
+        return q
+    
+    def resolve_medical_lab_services(
+        self,
+        info,
+        show_history=False,
+        pricelist_uuid=None,
+        client_mutation_id=None,
+        **kwargs
+    ):
+        if info.context.user.is_anonymous:
+            raise PermissionDenied(_("unauthorized"))
+        
+        queryset = LaboratoryService.get_queryset(
+            None, user=info.context.user, show_history=show_history
+        )
+        
+        if pricelist_uuid is not None:
+            queryset = queryset.filter(
+                pricelist_details__lab_services_pricelist__uuid=pricelist_uuid
+            )
+        
+        if client_mutation_id:
+            queryset = queryset.filter(
+                mutations__mutation__client_mutation_id=client_mutation_id
+            )
+        
+        if not show_history:
+            queryset = queryset.filter(*filter_validity(**kwargs))
+        
+        return gql_optimizer.query(queryset, info)
+    
+    def resolve_validate_lab_service_code(self, info, **kwargs):
+        if not info.context.user.has_perms(MedicalConfig.gql_query_medical_lab_services_perms):
+            raise PermissionDenied(_("unauthorized"))
+        
+        # You'll need to create check_unique_code_lab_service function
+        from medical.services import check_unique_code_lab_service
+        errors = check_unique_code_lab_service(code=kwargs['lab_service_code'])
+        return False if errors else True
+
 
     def resolve_diagnoses_str(self, info, **kwargs):
         if not info.context.user.has_perms(MedicalConfig.gql_query_diagnosis_perms):
@@ -205,3 +291,6 @@ class Mutation(graphene.ObjectType):
     create_item = CreateItemMutation.Field()
     update_item = UpdateItemMutation.Field()
     delete_item = DeleteItemMutation.Field()
+    create_lab_service = CreateLaboratoryServiceMutation.Field()
+    update_lab_service = UpdateLaboratoryServiceMutation.Field()
+    delete_lab_service = DeleteLaboratoryServiceMutation.Field()

@@ -17,6 +17,7 @@ from medical.models import Service, ServiceMutation, Item, ItemMutation, Service
 from medical.services import set_item_or_service_deleted
 from django.db import models
 from medical.utils import process_items_relations, process_services_relations
+from medical.models import LaboratoryService
 
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,11 @@ class ServiceInputType(ItemOrServiceInputType):
     category = graphene.String(required=False)
     items = graphene.List(ServiceItemInputType, required=False)
     services = graphene.List(ServiceServiceInputType, required=False)
+
+class LaboratoryServiceInputType(ItemOrServiceInputType):
+    description = graphene.String(required=False)
+    lab_type = graphene.String(required=False)  
+    service_category_id = graphene.Int(required=False)
 
 
 def reset_item_or_service_before_update(item_service):
@@ -351,6 +357,71 @@ class DeleteItemMutation(OpenIMISMutation):
                 })
                 continue
             errors += set_item_or_service_deleted(item, "item")
+        if len(errors) == 1:
+            errors = errors[0]['list']
+        return errors
+    
+
+class CreateLaboratoryServiceMutation(CreateOrUpdateItemOrServiceMutation):
+    _mutation_module = "medical"
+    _mutation_class = "CreateLaboratoryServiceMutation"
+    item_service_model = LaboratoryService
+
+    class Input(LaboratoryServiceInputType):
+        pass
+
+    @classmethod
+    def async_mutate(cls, user, **data):
+        try:
+            return cls.do_mutate(MedicalConfig.gql_mutation_medical_lab_services_add_perms, user, **data)
+        except Exception as exc:
+            return [{
+                'message': _("lab_service.mutation.failed_to_create_lab_service") % {'code': data['code']},
+                'detail': str(exc)}]
+
+
+class UpdateLaboratoryServiceMutation(CreateOrUpdateItemOrServiceMutation):
+    _mutation_module = "medical"
+    _mutation_class = "UpdateLaboratoryServiceMutation"
+    item_service_model = LaboratoryService
+
+    class Input(LaboratoryServiceInputType):
+        pass
+
+    @classmethod
+    def async_mutate(cls, user, **data):
+        try:
+            return cls.do_mutate(MedicalConfig.gql_mutation_medical_lab_services_update_perms, user, **data)
+        except Exception as exc:
+            return [{
+                'message': _("lab_service.mutation.failed_to_update_lab_service") % {'code': data['code']},
+                'detail': str(exc)}]
+
+
+class DeleteLaboratoryServiceMutation(OpenIMISMutation):
+    _mutation_module = "medical"
+    _mutation_class = "DeleteLaboratoryServiceMutation"
+
+    class Input(OpenIMISMutation.Input):
+        uuids = graphene.List(graphene.String)
+
+    @classmethod
+    def async_mutate(cls, user, **data):
+        if not user.has_perms(MedicalConfig.gql_mutation_medical_lab_services_delete_perms):
+            raise PermissionDenied(_("unauthorized"))
+        errors = []
+        for lab_service_uuid in data["uuids"]:
+            lab_service = LaboratoryService.objects \
+                .filter(uuid=lab_service_uuid) \
+                .first()
+            if lab_service is None:
+                errors.append({
+                    'title': lab_service_uuid,
+                    'list': [{'message': _(
+                        "lab_service.validation.id_does_not_exist") % {'id': lab_service_uuid}}]
+                })
+                continue
+            errors += set_item_or_service_deleted(lab_service, "lab_service")
         if len(errors) == 1:
             errors = errors[0]['list']
         return errors
