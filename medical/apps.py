@@ -6,16 +6,16 @@ DEFAULT_CFG = {
     "gql_query_diagnosis_perms": [],
     "gql_query_medical_items_perms": ['122101'],
     "gql_query_medical_services_perms": ['121401'],
-    "gql_query_medical_lab_services_perms": ['121501'],
+    "gql_query_medical_lab_services_perms": ['128301'],
     "gql_mutation_medical_items_add_perms": ['122102'],
     "gql_mutation_medical_items_update_perms": ['122103'],
     "gql_mutation_medical_items_delete_perms": ['122104'],
     "gql_mutation_medical_services_add_perms": ['121402'],
     "gql_mutation_medical_services_update_perms": ['121403'],
     "gql_mutation_medical_services_delete_perms": ['121404'],
-    "gql_mutation_medical_lab_services_add_perms": ['121502'],
-    "gql_mutation_medical_lab_services_update_perms": ['121503'],
-    "gql_mutation_medical_lab_services_delete_perms": ['121504'],
+    "gql_mutation_medical_lab_services_add_perms": ['128302'],
+    "gql_mutation_medical_lab_services_update_perms": ['128303'],
+    "gql_mutation_medical_lab_services_delete_perms": ['128304'],
 }
 
 
